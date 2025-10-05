@@ -171,7 +171,7 @@ void computeCost(WorkerArgs *const args) {
  * @param epsilon The algorithm is said to have converged when
  *     |currCost[i] - prevCost[i]| < epsilon for all i where i = 0, 1, ..., K-1
  */
-void kMeansThread(double *data, double *clusterCentroids, int *clusterAssignments,
+void kMeansThreadBase(double *data, double *clusterCentroids, int *clusterAssignments,
                int M, int N, int K, double epsilon) {
 
   // Used to track convergence

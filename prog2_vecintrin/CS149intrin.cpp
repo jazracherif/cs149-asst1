@@ -259,3 +259,16 @@ void addUserLog(const char * logStr) {
   CS149Logger.addLog(logStr, _cs149_init_ones(), 0);
 }
 
+void printFloatVector(__cs149_vec_float &vec){
+  for (int i=0; i<VECTOR_WIDTH; i++) {
+    printf("%f,", vec.value[i]);
+  } 
+    printf("\n");
+}
+
+void printIntVector(__cs149_vec_int &vec){
+for (int i=0; i<VECTOR_WIDTH; i++) {
+    printf("%d,", vec.value[i]);
+  } 
+    printf("\n");
+}

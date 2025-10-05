@@ -9,6 +9,7 @@
 using namespace ispc;
 
 extern void sqrtSerial(int N, float startGuess, float* values, float* output);
+extern void sqrtVectorized(int N, float startGuess, const float* values, float* output);
 
 static void verifyResult(int N, float* result, float* gold) {
     for (int i=0; i<N; i++) {
@@ -57,6 +58,25 @@ int main() {
 
     verifyResult(N, output, gold);
 
+    // Clear out the buffer
+    for (unsigned int i = 0; i < N; ++i)
+        output[i] = 0;
+
+    //
+    // And run the Vectorized implementation 3 times, again reporting the
+    // minimum time.
+    //
+    double minVectorized = 1e30;
+    for (int i = 0; i < 3; ++i) {
+        double startTime = CycleTimer::currentSeconds();
+        sqrtVectorized(N, initialGuess, values, output);
+        double endTime = CycleTimer::currentSeconds();
+        minVectorized = std::min(minVectorized, endTime - startTime);
+    }
+
+    printf("[sqrt vectorized]:\t\t[%.3f] ms\n", minVectorized * 1000);
+
+    verifyResult(N, output, gold);
     //
     // Compute the image using the ispc implementation; report the minimum
     // time of three runs.
@@ -93,6 +113,8 @@ int main() {
     verifyResult(N, output, gold);
 
     printf("\t\t\t\t(%.2fx speedup from ISPC)\n", minSerial/minISPC);
+    printf("\t\t\t\t(%.2fx speedup from Vectorized)\n", minSerial/minVectorized);
+
     printf("\t\t\t\t(%.2fx speedup from task ISPC)\n", minSerial/minTaskISPC);
 
     delete [] values;
