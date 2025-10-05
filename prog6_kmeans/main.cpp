@@ -17,6 +17,11 @@ using namespace std;
 extern void kMeansThread(double *data, double *clusterCentroids,
                       int *clusterAssignments, int M, int N, int K,
                       double epsilon);
+                      
+extern void kMeansThreadBase(double *data, double *clusterCentroids,
+                      int *clusterAssignments, int M, int N, int K,
+                      double epsilon);
+
 extern double dist(double *x, double *y, int nDim);
 
 // Utilities
@@ -135,12 +140,39 @@ int main() {
             clusterCentroids, M, N, K);
 
   double startTime = CycleTimer::currentSeconds();
-  kMeansThread(data, clusterCentroids, clusterAssignments, M, N, K, epsilon);
+  kMeansThreadBase(data, clusterCentroids, clusterAssignments, M, N, K, epsilon);
   double endTime = CycleTimer::currentSeconds();
-  printf("[Total Time]: %.3f ms\n", (endTime - startTime) * 1000);
+
+  double total_baseline_s = (endTime - startTime) * 1000;
+  printf("[Total Time Baseline]: %.3f ms\n", total_baseline_s);
 
   // Log the end state of the algorithm
   logToFile("./end.log", SAMPLE_RATE, data, clusterAssignments,
+            clusterCentroids, M, N, K);
+
+  /** ---
+   *  OPTIMIZED version 
+   *  ---- */
+  printf("== Optimized Version");
+
+  readData("./data.dat", &data, &clusterCentroids, &clusterAssignments, &M, &N,
+           &K, &epsilon);
+
+
+  // Log the starting state of the algorithm
+  logToFile("./start.optimized.log", SAMPLE_RATE, data, clusterAssignments,
+            clusterCentroids, M, N, K);
+
+  startTime = CycleTimer::currentSeconds();
+  kMeansThread(data, clusterCentroids, clusterAssignments, M, N, K, epsilon);
+  endTime = CycleTimer::currentSeconds();
+
+  double total_optimized_s = (endTime - startTime) * 1000;
+  printf("[Total Time Optimized]: %.3f ms - speedup %0.3fx\n", total_optimized_s, total_baseline_s/total_optimized_s);
+
+
+  // Log the end state of the algorithm
+  logToFile("./end.optimized.log", SAMPLE_RATE, data, clusterAssignments,
             clusterCentroids, M, N, K);
 
   free(data);

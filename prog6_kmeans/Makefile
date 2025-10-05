@@ -23,10 +23,10 @@ dirs:
 clean:
 		/bin/rm -rf $(OBJDIR) *.ppm *.log *.png *~ $(APP_NAME)
 
-OBJS=$(OBJDIR)/main.o $(OBJDIR)/kmeansThread.o $(OBJDIR)/utils.o $(PPM_OBJ) $(TASKSYS_OBJ)
+OBJS=$(OBJDIR)/main.o $(OBJDIR)/kmeansThread.o  $(OBJDIR)/prob6.o  $(OBJDIR)/utils.o $(PPM_OBJ) $(TASKSYS_OBJ)
 
 $(APP_NAME): dirs $(OBJS)
-		$(CXX) $(CXXFLAGS) -o $@ $(OBJS) -lm $(TASKSYS_LIB)
+		$(CXX)  $(CXXFLAGS) -o $@ $(OBJS) -lm $(TASKSYS_LIB)
 
 $(OBJDIR)/%.o: %.cpp
 		$(CXX) $< $(CXXFLAGS) -c -o $@

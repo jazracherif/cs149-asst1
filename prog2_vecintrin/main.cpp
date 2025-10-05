@@ -249,7 +249,108 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  __cs149_mask maskAll = _cs149_init_ones();
+  __cs149_mask maskExpAreOnes; // exponent is 0
+
+
+  __cs149_vec_int e;
+  __cs149_vec_int allZeroes = _cs149_vset_int(0);
+  __cs149_vec_int allOnes = _cs149_vset_int(1);
+
+  __cs149_vec_float v; 
+  __cs149_vec_float largeValues = _cs149_vset_float(9.999999f);
+
+  // If N is not divisble by vector width, clamp the remainer serially
+  // and then handle all the rest with SIMD               
+  int non_simd_op_N = N % VECTOR_WIDTH;
+
+  printf("N: %d, vector Width: %d, non simid: %d\n", N, VECTOR_WIDTH, non_simd_op_N);
+
+  if (non_simd_op_N != 0) {
+    clampedExpSerial(values, exponents, output, non_simd_op_N);
+    values += non_simd_op_N;
+    exponents += non_simd_op_N;
+    output += non_simd_op_N;
+    N = N - non_simd_op_N;
+  }
+
+
+  // loop over the vector side
+  for (int i = 0; i < N; i += VECTOR_WIDTH){
+    __cs149_vec_float result;
+
+    // initialize the result vector to 1 
+    _cs149_vset_float(result, 1.0, maskAll);
+
+    // Load exponents
+    _cs149_vload_int(e, exponents + i, maskAll);
+
+    // Get the mask of lanes for exponents == 0
+    _cs149_veq_int(maskExpAreOnes, e, allZeroes, maskAll);
+    
+    __cs149_mask maskExpNotZeroes = _cs149_mask_not(maskExpAreOnes);
+
+    // load the values for non-zero exponents in the right lanes
+    _cs149_vload_float(result, values + i, maskExpNotZeroes);
+
+    if (_cs149_cntbits(maskExpNotZeroes) == 0){
+      // All exponents are one, we have the results already, continue!
+      _cs149_vstore_float(output + i, result, maskAll);
+      continue;
+    }
+   
+    // Now disable the lanes for exponents equal to 1
+    __cs149_mask maskExpIsOne;
+    _cs149_veq_int(maskExpIsOne, e, allOnes, maskExpNotZeroes);
+
+    __cs149_mask NotOne = _cs149_mask_not(maskExpIsOne);
+    maskExpNotZeroes = _cs149_mask_and(maskExpNotZeroes, NotOne);
+
+    // Need 2 more temporary register for multiplications, one for base value, one for multiplier
+    __cs149_vec_float tempResult, multiplier;
+    _cs149_vmove_float(multiplier, result, maskExpNotZeroes);
+    _cs149_vmove_float(tempResult, result, maskExpNotZeroes);
+
+    // keep track of which lane is not yet done with exponentiation
+    __cs149_mask maskActive = maskExpNotZeroes;
   
+    // Keep track of the remaining number of multiplications needed
+    __cs149_vec_int count, countResult;
+    _cs149_vmove_int(count, e, maskExpNotZeroes);
+    _cs149_vsub_int(countResult, count, allOnes, maskExpNotZeroes);
+    _cs149_vmove_int(count, countResult, maskExpNotZeroes);
+
+    // start multiplying!
+    while(_cs149_cntbits(maskActive) !=0){
+      // Do one multiplication
+      _cs149_vmult_float(result, tempResult, multiplier, maskActive);
+
+      // reduce count for all active lanes
+      __cs149_vec_int countResult;
+      _cs149_vsub_int(countResult, count, allOnes, maskActive); 
+      
+      // update active lanes
+      __cs149_mask maskInative;
+      _cs149_veq_int(maskInative, countResult, allZeroes, maskActive);
+
+      __cs149_mask NotmaskInative = _cs149_mask_not(maskInative);
+      maskActive = _cs149_mask_and(maskActive, NotmaskInative);
+
+      // update tempResult for the active lanes
+      _cs149_vmove_float(tempResult, result, maskActive);
+      _cs149_vmove_int(count, countResult, maskActive);
+     
+    }
+
+    // Clamp `result` the values above 9.999999f 
+    // only for the active lanes that are too large
+    __cs149_mask maskLargeResults = _cs149_init_ones(0);
+
+    _cs149_vgt_float(maskLargeResults, result, largeValues, maskExpNotZeroes);
+    _cs149_vset_float(result, 9.999999f, maskLargeResults);
+
+    _cs149_vstore_float(output + i, result, maskAll);
+  }
 }
 
 // returns the sum of all elements in values
@@ -270,11 +371,35 @@ float arraySumVector(float* values, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-  
-  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+  __cs149_mask maskAll = _cs149_init_ones();
+  __cs149_mask maskFirstHalf = _cs149_init_ones(VECTOR_WIDTH/2);
 
+  __cs149_vec_float v;
+  __cs149_vec_float sum = _cs149_vset_float(0.0);
+
+  // Add all values VECTOR by Vector
+  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+    _cs149_vload_float(v, values + i, maskAll);
+    _cs149_vadd_float(sum, sum, v, maskAll);
   }
 
-  return 0.0;
+  float iter = 1;
+  __cs149_vec_float sumRes, interRes;
+
+  while(iter < VECTOR_WIDTH){
+    _cs149_hadd_float(sumRes, sum);
+    _cs149_interleave_float(sum, sumRes);
+
+    // __cs149_mask mask = _cs149_init_ones(VECTOR_WIDTH / iter);
+    // _cs149_vmove_float(sum, interRes, mask);
+    iter = iter * 2;
+  }
+
+  __cs149_mask first = _cs149_init_ones(1);
+  float res = 0;
+  _cs149_vstore_float(&res, sum, first);
+
+  printf("Sum is: %f \n", res);
+  return res;
 }
 
